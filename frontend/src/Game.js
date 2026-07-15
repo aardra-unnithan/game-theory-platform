@@ -1,32 +1,45 @@
 import { useState, useEffect } from "react";
 
-const API = "http://127.0.0.1:8000";
-
-function Game({ studentName, sessionId, onComplete, onBack }) {
+function Game({ studentName, sessionId, totalRounds, onComplete, onBack, api }) {
   const [round, setRound] = useState(1);
   const [moves, setMoves] = useState([]);
   const [currentResult, setCurrentResult] = useState(null);
   const [totalScore, setTotalScore] = useState({ student: 0, ai: 0 });
   const [aiThinking, setAiThinking] = useState(false);
   const [hint, setHint] = useState(null);
-
-  const TOTAL_ROUNDS = 5;
+  const [currentPayoff, setCurrentPayoff] = useState(null);
+  const [agentType, setAgentType] = useState("rational");
 
   useEffect(() => {
     const interval = setInterval(async () => {
-      const res = await fetch(`${API}/hint/${sessionId}`);
+      const res = await fetch(`${api}/hint/${sessionId}`);
       const data = await res.json();
       if (data.hint) setHint(data.hint);
     }, 5000);
     return () => clearInterval(interval);
-  }, [sessionId]);
+  }, [sessionId, api]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const res = await fetch(`${api}/game/settings`);
+      const data = await res.json();
+      setCurrentPayoff(data.prisoners_dilemma.payoff_matrix);
+      setAgentType(data.prisoners_dilemma.agent_type);
+    };
+    fetchSettings();
+    const interval = setInterval(fetchSettings, 5000);
+    return () => clearInterval(interval);
+  }, [api]);
 
   const handleMove = async (studentMove) => {
     setAiThinking(true);
-    const res = await fetch(`${API}/move`, {
+    const res = await fetch(`${api}/move/pd`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, student_move: studentMove }),
+      body: JSON.stringify({
+        session_id: sessionId,
+        student_move: studentMove,
+      }),
     });
     const data = await res.json();
     setAiThinking(false);
@@ -41,18 +54,41 @@ function Game({ studentName, sessionId, onComplete, onBack }) {
 
     setMoves((prev) => [...prev, newMove]);
     setCurrentResult(newMove);
-    setTotalScore({ student: data.total_student_score, ai: data.total_ai_score });
+    setTotalScore({
+      student: data.total_student_score,
+      ai: data.total_ai_score,
+    });
 
     if (data.game_over) {
       onComplete({
         moves: [...moves, newMove],
-        totalScore: { student: data.total_student_score, ai: data.total_ai_score },
+        totalScore: {
+          student: data.total_student_score,
+          ai: data.total_ai_score,
+        },
         analysis: data.analysis,
       });
     } else {
       setRound(data.round + 1);
     }
   };
+
+  const matrixData = currentPayoff ? [
+    {
+      row: "You: Silence",
+      cols: [
+        { label: `${currentPayoff.both_silence.student}, ${currentPayoff.both_silence.ai}`, highlight: true },
+        { label: `${currentPayoff.student_silence_ai_testify.student}, ${currentPayoff.student_silence_ai_testify.ai}`, highlight: false },
+      ],
+    },
+    {
+      row: "You: Testify",
+      cols: [
+        { label: `${currentPayoff.student_testify_ai_silence.student}, ${currentPayoff.student_testify_ai_silence.ai}`, highlight: false },
+        { label: `${currentPayoff.both_testify.student}, ${currentPayoff.both_testify.ai}`, highlight: false },
+      ],
+    },
+  ] : null;
 
   return (
     <div style={s.gamePage}>
@@ -61,15 +97,13 @@ function Game({ studentName, sessionId, onComplete, onBack }) {
           <span style={s.topLabel}>GameTheory Lab</span>
           <span style={s.topSep}>|</span>
           <span style={s.topLabel}>Prisoner's Dilemma</span>
+          <span style={s.topSep}>|</span>
+          <span style={s.agentBadge}>{agentType} agent</span>
         </div>
         <div style={s.topRight}>
-          <button style={s.backToMenu} onClick={onBack}>
-            Back to Menu
-          </button>
-          <span style={s.roundBadge}>Round {round} of {TOTAL_ROUNDS}</span>
-          <span style={s.scoreBadge}>
-            You: {totalScore.student} | AI: {totalScore.ai}
-          </span>
+          <button style={s.backToMenu} onClick={onBack}>Back to Menu</button>
+          <span style={s.roundBadge}>Round {round} of {totalRounds}</span>
+          <span style={s.scoreBadge}>You: {totalScore.student} | AI: {totalScore.ai}</span>
         </div>
       </div>
 
@@ -83,7 +117,7 @@ function Game({ studentName, sessionId, onComplete, onBack }) {
           </p>
 
           <div style={s.matrixSection}>
-            <p style={s.sectionLabel}>Payoff Matrix — Harrington Chapter 4</p>
+            <p style={s.sectionLabel}>Live Payoff Matrix</p>
             <table style={s.matrix}>
               <thead>
                 <tr>
@@ -93,16 +127,29 @@ function Game({ studentName, sessionId, onComplete, onBack }) {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td style={s.mc}>You: Silence</td>
-                  <td style={s.mcHL}>3, 3</td>
-                  <td style={s.mc}>1, 4</td>
-                </tr>
-                <tr>
-                  <td style={s.mc}>You: Testify</td>
-                  <td style={s.mc}>4, 1</td>
-                  <td style={s.mc}>2, 2</td>
-                </tr>
+                {matrixData ? matrixData.map((row, i) => (
+                  <tr key={i}>
+                    <td style={s.mc}>{row.row}</td>
+                    {row.cols.map((col, j) => (
+                      <td key={j} style={col.highlight ? s.mcHL : s.mc}>
+                        {col.label}
+                      </td>
+                    ))}
+                  </tr>
+                )) : (
+                  <>
+                    <tr>
+                      <td style={s.mc}>You: Silence</td>
+                      <td style={s.mcHL}>3, 3</td>
+                      <td style={s.mc}>1, 4</td>
+                    </tr>
+                    <tr>
+                      <td style={s.mc}>You: Testify</td>
+                      <td style={s.mc}>4, 1</td>
+                      <td style={s.mc}>2, 2</td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
           </div>
@@ -113,12 +160,8 @@ function Game({ studentName, sessionId, onComplete, onBack }) {
               {moves.map((m) => (
                 <div key={m.round} style={s.historyRow}>
                   <span style={s.historyRound}>R{m.round}</span>
-                  <span style={s.historyMove}>
-                    You: <strong>{m.studentMove}</strong>
-                  </span>
-                  <span style={s.historyMove}>
-                    AI: <strong>{m.aiMove}</strong>
-                  </span>
+                  <span style={s.historyMove}>You: <strong>{m.studentMove}</strong></span>
+                  <span style={s.historyMove}>AI: <strong>{m.aiMove}</strong></span>
                   <span style={s.historyScore}>+{m.studentPayoff} pts</span>
                 </div>
               ))}
@@ -131,9 +174,7 @@ function Game({ studentName, sessionId, onComplete, onBack }) {
             <div style={s.hintBox}>
               <p style={s.hintLabel}>Message from Professor</p>
               <p style={s.hintText}>{hint}</p>
-              <button style={s.hintDismiss} onClick={() => setHint(null)}>
-                Dismiss
-              </button>
+              <button style={s.hintDismiss} onClick={() => setHint(null)}>Dismiss</button>
             </div>
           )}
 
@@ -213,6 +254,17 @@ const s = {
   topSep: {
     color: "#333",
     fontSize: "12px",
+  },
+  agentBadge: {
+    fontSize: "11px",
+    color: "#f0b429",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: "1px",
+    backgroundColor: "#1a1500",
+    padding: "4px 10px",
+    borderRadius: "4px",
+    border: "1px solid #4a3800",
   },
   topRight: {
     display: "flex",

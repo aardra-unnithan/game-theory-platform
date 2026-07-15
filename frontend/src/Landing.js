@@ -1,46 +1,31 @@
 import { useState, useEffect } from "react";
 
-const TOPICS = [
+const GAMES = [
   {
-    id: "ch4",
-    chapter: "Chapter 4",
-    title: "Dominant Strategy & Nash Equilibrium",
-    games: [
-      {
-        id: "prisoners-dilemma",
-        title: "The Prisoner's Dilemma",
-        active: true,
-      },
-    ],
+    id: "prisoners-dilemma",
+    title: "Prisoner's Dilemma",
+    active: true,
+    gameType: "prisoners_dilemma",
+    tagline: "Two rational minds. One impossible choice.",
+    story: `It is 1950. You and your accomplice have been arrested and placed in separate rooms. You cannot communicate. The detective offers you both the same deal — betray your partner or stay silent. What do you do?`,
+    quote: `During the time of Stalin, an orchestra conductor was arrested by the KGB for reading a musical score on a train. The next day, the interrogator walks in and says: You might as well confess — we've caught your accomplice Tchaikovsky, and he's already talking.`,
+    quoteSource: "Harrington, Games, Strategies, and Decision Making",
+    concept: "Dominant Strategy — Nash Equilibrium",
   },
   {
-    id: "ch9",
-    chapter: "Chapter 9",
-    title: "Sequential Games & Backward Induction",
-    games: [
-      {
-        id: "british-intelligence",
-        title: "British Intelligence Game",
-        active: false,
-      },
-    ],
-  },
-  {
-    id: "ch13",
-    chapter: "Chapter 13",
-    title: "Repeated Games",
-    games: [
-      {
-        id: "trench-warfare",
-        title: "Trench Warfare",
-        active: false,
-      },
-    ],
+    id: "centipede",
+    title: "Centipede Game",
+    active: true,
+    gameType: "centipede",
+    tagline: "The longer you wait, the more there is to gain — or lose.",
+    story: `It is 1850s Istanbul. You are a merchant who has been approached by a trader from the East with a remarkable proposal. At any moment you can take your share of the deal and walk away. But if you both agree to continue negotiating, the deal grows more valuable. The catch — at every stage, the other merchant decides next. Do you trust them to keep negotiating? Or do you take your share now before they walk away with the bigger cut?`,
+    quote: `In laboratory experiments, subjects almost never stop immediately — even though rational game theory predicts they should. Trust, optimism, and social instinct override cold calculation.`,
+    quoteSource: "McKelvey and Palfrey, Econometrica, 1992",
+    concept: "Backward Induction — Subgame Perfect Nash Equilibrium",
   },
 ];
 
-// Typewriter hook
-function useTypewriter(text, speed = 50, start = false) {
+function useTypewriter(text, speed = 60, start = false) {
   const [displayed, setDisplayed] = useState("");
   useEffect(() => {
     if (!start) return;
@@ -57,37 +42,34 @@ function useTypewriter(text, speed = 50, start = false) {
 }
 
 function Landing({ onStartGame, onProfessor }) {
-  const [expandedChapter, setExpandedChapter] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
   const [animating, setAnimating] = useState(false);
-  const [showQuote, setShowQuote] = useState(false);
+  const [showStory, setShowStory] = useState(false);
   const [showMatrix, setShowMatrix] = useState(false);
   const [showButton, setShowButton] = useState(false);
   const [lampAngle, setLampAngle] = useState(0);
 
   const typedTitle = useTypewriter(
-    "The Prisoner's Dilemma",
+    selectedGame?.title || "",
     60,
     animating
   );
 
-  // Trigger animations in sequence when game is selected
   useEffect(() => {
     if (!selectedGame) return;
     setAnimating(false);
-    setShowQuote(false);
+    setShowStory(false);
     setShowMatrix(false);
     setShowButton(false);
 
     setTimeout(() => setAnimating(true), 300);
-    setTimeout(() => setShowQuote(true), 1800);
+    setTimeout(() => setShowStory(true), 1800);
     setTimeout(() => setShowMatrix(true), 2600);
     setTimeout(() => setShowButton(true), 3200);
   }, [selectedGame]);
 
-  // Lamp swing animation
   useEffect(() => {
-    if (!animating) return;
+    if (!animating || selectedGame?.gameType !== "prisoners_dilemma") return;
     let angle = 0;
     let direction = 1;
     let speed = 0.8;
@@ -100,18 +82,14 @@ function Landing({ onStartGame, onProfessor }) {
       setLampAngle(angle);
     }, 16);
     return () => clearInterval(interval);
-  }, [animating]);
-
-  const handleChapterClick = (chapterId) => {
-    setExpandedChapter(expandedChapter === chapterId ? null : chapterId);
-    setSelectedGame(null);
-    setAnimating(false);
-  };
+  }, [animating, selectedGame]);
 
   const handleGameClick = (game) => {
     if (!game.active) return;
     setSelectedGame(game);
   };
+
+  const coinCount = showButton ? 6 : showMatrix ? 4 : showStory ? 2 : 1;
 
   return (
     <div style={s.page}>
@@ -125,53 +103,27 @@ function Landing({ onStartGame, onProfessor }) {
 
         <div style={s.divider}></div>
 
-        <div style={s.topicList}>
-          {TOPICS.map((topic) => (
-            <div key={topic.id}>
-              {/* Chapter header — clickable accordion */}
-              <button
-                style={s.chapterBtn}
-                onClick={() => handleChapterClick(topic.id)}
-              >
-                <div style={s.chapterBtnLeft}>
-                  <p style={s.chapterLabel}>{topic.chapter}</p>
-                  <p style={s.chapterTitle}>{topic.title}</p>
-                </div>
-                <span style={{
-                  ...s.chapterArrow,
-                  transform: expandedChapter === topic.id
-                    ? "rotate(90deg)"
-                    : "rotate(0deg)",
-                }}>
-                  ›
-                </span>
-              </button>
-
-              {/* Games under this chapter */}
-              {expandedChapter === topic.id && (
-                <div style={s.gamesWrap}>
-                  {topic.games.map((game) => (
-                    <button
-                      key={game.id}
-                      style={{
-                        ...s.gameBtn,
-                        ...(game.active ? {} : s.gameBtnLocked),
-                        ...(selectedGame?.id === game.id
-                          ? s.gameBtnActive
-                          : {}),
-                      }}
-                      onClick={() => handleGameClick(game)}
-                      disabled={!game.active}
-                    >
-                      <span>{game.title}</span>
-                      {!game.active && (
-                        <span style={s.comingSoon}>Soon</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+        <div style={s.gameList}>
+          <p style={s.listLabel}>Games</p>
+          {GAMES.map((game) => (
+            <button
+              key={game.id}
+              style={{
+                ...s.gameBtn,
+                ...(selectedGame?.id === game.id ? s.gameBtnActive : {}),
+                ...(!game.active ? s.gameBtnLocked : {}),
+              }}
+              onClick={() => handleGameClick(game)}
+              disabled={!game.active}
+            >
+              <div style={s.gameBtnLeft}>
+                <span style={s.gameBtnTitle}>{game.title}</span>
+                <span style={s.gameBtnConcept}>{game.concept}</span>
+              </div>
+              {selectedGame?.id === game.id && (
+                <span style={s.activeDot}></span>
               )}
-            </div>
+            </button>
           ))}
         </div>
 
@@ -185,36 +137,50 @@ function Landing({ onStartGame, onProfessor }) {
       {/* MAIN AREA */}
       <div style={s.main}>
         {!selectedGame ? (
-          // WELCOME STATE
           <div style={s.welcomeWrap}>
             <p style={s.welcomeTag}>Welcome to</p>
             <h2 style={s.welcomeTitle}>GameTheory Lab</h2>
             <p style={s.welcomeDesc}>
               An AI-powered platform for learning game theory through
-              interactive play. Select a chapter from the sidebar to begin.
+              interactive play. Select a game from the sidebar to begin.
             </p>
             <div style={s.welcomeHint}>
               <span style={s.hintArrow}>←</span>
-              <span style={s.hintText}>
-                Select a chapter to explore games
-              </span>
+              <span style={s.hintText}>Select a game to explore</span>
             </div>
           </div>
         ) : (
-          // GAME PREVIEW WITH ANIMATIONS
           <div style={s.gamePreview}>
 
-            {/* Interrogation lamp SVG animation */}
-            <div style={s.lampWrap}>
-              <div style={{
-                ...s.lampPivot,
-                transform: `rotate(${lampAngle}deg)`,
-              }}>
-                <div style={s.lampCord}></div>
-                <div style={s.lampShade}></div>
-                <div style={s.lampLight}></div>
+            {/* Animation */}
+            {selectedGame.gameType === "prisoners_dilemma" ? (
+              <div style={s.lampWrap}>
+                <div style={{
+                  ...s.lampPivot,
+                  transform: `rotate(${lampAngle}deg)`,
+                }}>
+                  <div style={s.lampCord}></div>
+                  <div style={s.lampShade}></div>
+                  <div style={s.lampLight}></div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={s.coinWrap}>
+                {[...Array(coinCount)].map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      ...s.coin,
+                      bottom: `${i * 18}px`,
+                      opacity: 1,
+                    }}
+                  >
+                    <span style={s.coinSign}>$</span>
+                  </div>
+                ))}
+                <div style={s.coinGlow}></div>
+              </div>
+            )}
 
             {/* Back button */}
             <button
@@ -224,115 +190,59 @@ function Landing({ onStartGame, onProfessor }) {
                 setAnimating(false);
               }}
             >
-              ← Back to Home
+              ← Back
             </button>
 
             {/* Typewriter title */}
             <div style={s.titleWrap}>
-              <p style={s.eyebrow}>
-                Chapter 4 — Dominant Strategy & Nash Equilibrium
-              </p>
               <h2 style={s.gameTitle}>
                 {typedTitle}
                 <span style={s.cursor}>|</span>
               </h2>
+              <p style={s.gameTagline}>{selectedGame.tagline}</p>
             </div>
 
-            {/* Quote fades in */}
+            {/* Story fades in */}
             <div style={{
-              ...s.quoteCard,
-              opacity: showQuote ? 1 : 0,
-              transform: showQuote ? "translateY(0)" : "translateY(20px)",
+              ...s.storyCard,
+              opacity: showStory ? 1 : 0,
+              transform: showStory ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.8s ease",
             }}>
-              <p style={s.quoteLabel}>From Harrington, Chapter 4</p>
-              <p style={s.quoteText}>
-                "During the time of Stalin, an orchestra conductor was
-                arrested by the KGB for reading a musical score on a train.
-                The next day, the interrogator walks in and says: 'You might
-                as well confess — we've caught your accomplice Tchaikovsky,
-                and he's already talking.'"
-              </p>
+              <p style={s.storyLabel}>The Scenario</p>
+              <p style={s.storyText}>{selectedGame.story}</p>
             </div>
 
-            {/* Matrix slides up */}
+            {/* Quote slides up */}
             <div style={{
-              ...s.matrixWrap,
+              ...s.quoteCard,
               opacity: showMatrix ? 1 : 0,
               transform: showMatrix ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.8s ease",
             }}>
-              <p style={s.quoteLabel}>
-                The Payoff Matrix — Harrington Chapter 4
-              </p>
-              <table style={s.matrix}>
-                <thead>
-                  <tr>
-                    <th style={s.mh}></th>
-                    <th style={s.mh}>AI: Silence</th>
-                    <th style={s.mh}>AI: Testify</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={s.mc}>You: Silence</td>
-                    <td style={s.mcHL}>3, 3</td>
-                    <td style={s.mc}>1, 4</td>
-                  </tr>
-                  <tr>
-                    <td style={s.mc}>You: Testify</td>
-                    <td style={s.mc}>4, 1</td>
-                    <td style={s.mc}>2, 2</td>
-                  </tr>
-                </tbody>
-              </table>
+              <p style={s.quoteLabel}>{selectedGame.quoteSource}</p>
+              <p style={s.quoteText}>"{selectedGame.quote}"</p>
             </div>
 
-            {/* Enter button pulses in */}
+            {/* Button pulses in */}
             <div style={{
               ...s.btnWrap,
               opacity: showButton ? 1 : 0,
               transform: showButton ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.8s ease",
             }}>
-              <div style={s.gameInfoRow}>
-                <div style={s.infoBox}>
-                  <p style={s.infoNum}>5</p>
-                  <p style={s.infoLabel}>Rounds</p>
-                </div>
-                <div style={s.infoBox}>
-                  <p style={s.infoNum}>AI</p>
-                  <p style={s.infoLabel}>Opponent</p>
-                </div>
-                <div style={s.infoBox}>
-                  <p style={s.infoNum}>Ch.4</p>
-                  <p style={s.infoLabel}>Harrington</p>
-                </div>
-              </div>
               <button
-                style={{
-                  ...s.startBtn,
-                  animation: showButton
-                    ? "pulse 2s infinite"
-                    : "none",
-                }}
-                onClick={onStartGame}
+                style={s.startBtn}
+                onClick={() => onStartGame(selectedGame)}
               >
                 Enter as Student
               </button>
             </div>
-
           </div>
         )}
       </div>
 
-      {/* Pulse animation style */}
       <style>{`
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4); }
-          70% { box-shadow: 0 0 0 12px rgba(192, 57, 43, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); }
-        }
         @keyframes blink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
@@ -349,16 +259,14 @@ const s = {
     display: "flex",
     fontFamily: "'Segoe UI', system-ui, sans-serif",
   },
-
-  // SIDEBAR
   sidebar: {
-    width: "300px",
-    minWidth: "300px",
+    width: "280px",
+    minWidth: "280px",
     backgroundColor: "#0a0a0a",
     borderRight: "1px solid #1f1f1f",
     display: "flex",
     flexDirection: "column",
-    padding: "36px 24px",
+    padding: "32px 20px",
   },
   sidebarTop: {
     display: "flex",
@@ -393,98 +301,62 @@ const s = {
     backgroundColor: "#1f1f1f",
     margin: "20px 0",
   },
-  topicList: {
+  gameList: {
     display: "flex",
     flexDirection: "column",
-    gap: "4px",
+    gap: "8px",
     flex: 1,
   },
-
-  // CHAPTER ACCORDION BUTTON
-  chapterBtn: {
-    width: "100%",
-    padding: "14px 16px",
-    borderRadius: "8px",
-    border: "none",
-    backgroundColor: "transparent",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    textAlign: "left",
-  },
-  chapterBtnLeft: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "3px",
-  },
-  chapterLabel: {
+  listLabel: {
     fontSize: "10px",
-    color: "#c0392b",
+    color: "#444",
     textTransform: "uppercase",
     letterSpacing: "2px",
-    margin: 0,
+    margin: "0 0 8px 0",
     fontWeight: "700",
-  },
-  chapterTitle: {
-    fontSize: "13px",
-    color: "#888",
-    margin: 0,
-    lineHeight: "1.3",
-  },
-  chapterArrow: {
-    fontSize: "20px",
-    color: "#444",
-    transition: "transform 0.2s ease",
-    lineHeight: "1",
-  },
-
-  // GAMES UNDER CHAPTER
-  gamesWrap: {
-    paddingLeft: "16px",
-    paddingBottom: "8px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
   },
   gameBtn: {
     width: "100%",
-    padding: "11px 14px",
-    borderRadius: "6px",
-    border: "1px solid #2a2a2a",
+    padding: "14px 16px",
+    borderRadius: "8px",
+    border: "1px solid #1f1f1f",
     backgroundColor: "#141414",
-    color: "#cccccc",
-    fontSize: "13px",
     cursor: "pointer",
     textAlign: "left",
-    fontWeight: "600",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  gameBtnLocked: {
-    color: "#333",
-    cursor: "not-allowed",
-    backgroundColor: "#0d0d0d",
-    border: "1px solid #1a1a1a",
+    gap: "8px",
   },
   gameBtnActive: {
     backgroundColor: "#1a0808",
     border: "1px solid #c0392b",
+  },
+  gameBtnLocked: {
+    opacity: 0.3,
+    cursor: "not-allowed",
+  },
+  gameBtnLeft: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  gameBtnTitle: {
+    fontSize: "14px",
     color: "#ffffff",
+    fontWeight: "700",
   },
-  comingSoon: {
-    fontSize: "9px",
-    color: "#333",
-    textTransform: "uppercase",
-    letterSpacing: "1px",
-    backgroundColor: "#1a1a1a",
-    padding: "2px 6px",
-    borderRadius: "4px",
+  gameBtnConcept: {
+    fontSize: "11px",
+    color: "#555",
   },
-
-  // PROFESSOR BUTTON
+  activeDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    backgroundColor: "#c0392b",
+    flexShrink: 0,
+  },
   profBtn: {
     width: "100%",
     padding: "14px",
@@ -497,8 +369,6 @@ const s = {
     fontWeight: "700",
     marginTop: "8px",
   },
-
-  // MAIN AREA
   main: {
     flex: 1,
     display: "flex",
@@ -506,10 +376,7 @@ const s = {
     justifyContent: "center",
     padding: "60px",
     overflowY: "auto",
-    position: "relative",
   },
-
-  // WELCOME STATE
   welcomeWrap: {
     maxWidth: "600px",
     width: "100%",
@@ -538,42 +405,35 @@ const s = {
     color: "#555",
     lineHeight: "1.8",
     margin: 0,
-    maxWidth: "480px",
   },
   welcomeHint: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
-    marginTop: "16px",
+    marginTop: "8px",
   },
   hintArrow: {
     fontSize: "20px",
     color: "#c0392b",
-    animation: "pulse 2s infinite",
   },
   hintText: {
     fontSize: "14px",
-    color: "#444",
+    color: "#333",
     fontStyle: "italic",
   },
-
-  // GAME PREVIEW
   gamePreview: {
-    maxWidth: "720px",
+    maxWidth: "680px",
     width: "100%",
     display: "flex",
     flexDirection: "column",
-    gap: "28px",
-    position: "relative",
+    gap: "24px",
   },
-
-  // LAMP ANIMATION
   lampWrap: {
     display: "flex",
     justifyContent: "center",
-    height: "120px",
+    height: "100px",
     position: "relative",
-    marginBottom: "-20px",
+    marginBottom: "-10px",
   },
   lampPivot: {
     transformOrigin: "top center",
@@ -585,73 +445,104 @@ const s = {
   },
   lampCord: {
     width: "2px",
-    height: "60px",
-    backgroundColor: "#444",
+    height: "50px",
+    backgroundColor: "#333",
   },
   lampShade: {
-    width: "60px",
+    width: "50px",
     height: "0",
-    borderLeft: "30px solid transparent",
-    borderRight: "30px solid transparent",
-    borderTop: "40px solid #2a2a2a",
+    borderLeft: "25px solid transparent",
+    borderRight: "25px solid transparent",
+    borderTop: "32px solid #2a2a2a",
   },
   lampLight: {
-    width: "80px",
-    height: "40px",
-    borderRadius: "0 0 40px 40px",
-    background: "radial-gradient(ellipse at top, rgba(255,220,100,0.15) 0%, transparent 70%)",
+    width: "70px",
+    height: "35px",
+    borderRadius: "0 0 35px 35px",
+    background: "radial-gradient(ellipse at top, rgba(255,220,100,0.12) 0%, transparent 70%)",
     marginTop: "-4px",
   },
-
-  // BACK BUTTON
+  coinWrap: {
+    position: "relative",
+    height: "140px",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    marginBottom: "-10px",
+  },
+  coin: {
+    position: "absolute",
+    width: "64px",
+    height: "64px",
+    borderRadius: "50%",
+    background: "radial-gradient(circle at 35% 35%, #f5d76e, #c9922a 60%, #8a5e0a)",
+    border: "3px solid #f0c040",
+    boxShadow: "0 4px 0px #7a4e0a, 0 6px 12px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.3)",
+    transition: "all 0.4s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  coinSign: {
+    fontSize: "22px",
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.55)",
+    textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+    userSelect: "none",
+    lineHeight: "1",
+  },
+  coinGlow: {
+    position: "absolute",
+    bottom: "-8px",
+    width: "90px",
+    height: "16px",
+    borderRadius: "50%",
+    background: "radial-gradient(ellipse, rgba(240,192,64,0.25) 0%, transparent 70%)",
+  },
   backBtn: {
     alignSelf: "flex-start",
     padding: "10px 20px",
     borderRadius: "6px",
-    border: "1.5px solid #333",
+    border: "1.5px solid #2a2a2a",
     backgroundColor: "transparent",
-    color: "#888",
+    color: "#666",
     fontSize: "13px",
     cursor: "pointer",
     fontWeight: "600",
   },
-
-  // ANIMATED CONTENT
   titleWrap: {
     display: "flex",
     flexDirection: "column",
     gap: "8px",
   },
-  eyebrow: {
-    fontSize: "11px",
-    color: "#c0392b",
-    textTransform: "uppercase",
-    letterSpacing: "2px",
-    margin: 0,
-    fontWeight: "700",
-  },
   gameTitle: {
-    fontSize: "56px",
+    fontSize: "52px",
     color: "#ffffff",
     margin: 0,
     fontWeight: "900",
     letterSpacing: "-1.5px",
     lineHeight: "1.1",
-    minHeight: "70px",
+    minHeight: "65px",
+  },
+  gameTagline: {
+    fontSize: "16px",
+    color: "#555",
+    margin: 0,
+    fontStyle: "italic",
   },
   cursor: {
     animation: "blink 1s infinite",
     color: "#c0392b",
     fontWeight: "300",
   },
-  quoteCard: {
+  storyCard: {
     backgroundColor: "#141414",
     border: "1px solid #1f1f1f",
     borderLeft: "4px solid #c0392b",
     padding: "24px 28px",
     borderRadius: "8px",
   },
-  quoteLabel: {
+  storyLabel: {
     fontSize: "10px",
     color: "#c0392b",
     textTransform: "uppercase",
@@ -659,74 +550,37 @@ const s = {
     margin: "0 0 12px 0",
     fontWeight: "700",
   },
-  quoteText: {
+  storyText: {
     fontSize: "15px",
     color: "#aaaaaa",
-    fontStyle: "italic",
     lineHeight: "1.9",
     margin: 0,
   },
-  matrixWrap: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
+  quoteCard: {
+    backgroundColor: "#0a0a0a",
+    border: "1px solid #1f1f1f",
+    padding: "20px 24px",
+    borderRadius: "8px",
   },
-  matrix: {
-    borderCollapse: "collapse",
-    width: "100%",
-    fontSize: "14px",
-  },
-  mh: {
-    border: "1px solid #2a2a2a",
-    padding: "12px 16px",
-    color: "#555",
-    textAlign: "center",
-    backgroundColor: "#111",
+  quoteLabel: {
+    fontSize: "10px",
+    color: "#444",
+    textTransform: "uppercase",
+    letterSpacing: "2px",
+    margin: "0 0 10px 0",
     fontWeight: "700",
   },
-  mc: {
-    border: "1px solid #2a2a2a",
-    padding: "12px 16px",
-    color: "#aaaaaa",
-    textAlign: "center",
-  },
-  mcHL: {
-    border: "2px solid #c0392b",
-    padding: "12px 16px",
-    color: "#c0392b",
-    textAlign: "center",
-    backgroundColor: "#1a0808",
-    fontWeight: "900",
-    fontSize: "17px",
+  quoteText: {
+    fontSize: "14px",
+    color: "#555",
+    fontStyle: "italic",
+    lineHeight: "1.8",
+    margin: 0,
   },
   btnWrap: {
     display: "flex",
     flexDirection: "column",
-    gap: "16px",
-  },
-  gameInfoRow: {
-    display: "flex",
     gap: "12px",
-  },
-  infoBox: {
-    backgroundColor: "#141414",
-    border: "1px solid #1f1f1f",
-    borderRadius: "8px",
-    padding: "16px 24px",
-    textAlign: "center",
-  },
-  infoNum: {
-    fontSize: "24px",
-    fontWeight: "900",
-    color: "#c0392b",
-    margin: "0 0 4px 0",
-  },
-  infoLabel: {
-    fontSize: "11px",
-    color: "#444",
-    textTransform: "uppercase",
-    letterSpacing: "1px",
-    margin: 0,
   },
   startBtn: {
     padding: "18px 40px",
