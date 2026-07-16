@@ -8,7 +8,7 @@ import CentipedeResults from "./CentipedeResults";
 import TravelersResults from "./TravelersResults";
 import Dashboard from "./Dashboard";
 
-const API = "http://192.168.1.114:8000";
+const API = "https://crestless-tartness-pruning.ngrok-free.dev";
 
 function App() {
   const [page, setPage] = useState("landing");

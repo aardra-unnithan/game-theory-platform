@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import pathlib
 from pydantic import BaseModel
 import uuid
 import datetime
@@ -965,3 +968,11 @@ def clear_session_code(data: SessionCodeRequest):
 @app.get("/game/settings")
 def get_game_settings():
     return game_settings
+# Serve React frontend
+BUILD_DIR = pathlib.Path(__file__).parent.parent / "frontend" / "build"
+if BUILD_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(BUILD_DIR / "static")), name="static")
+
+    @app.get("/{full_path:path}")
+    def serve_frontend(full_path: str):
+        return FileResponse(str(BUILD_DIR / "index.html"))
