@@ -18,10 +18,21 @@ const GAMES = [
     active: true,
     gameType: "centipede",
     tagline: "The longer you wait, the more there is to gain — or lose.",
-    story: `It is 1850s Istanbul. You are a merchant who has been approached by a trader from the East with a remarkable proposal. At any moment you can take your share of the deal and walk away. But if you both agree to continue negotiating, the deal grows more valuable. The catch — at every stage, the other merchant decides next. Do you trust them to keep negotiating? Or do you take your share now before they walk away with the bigger cut?`,
+    story: `It is 1850s Istanbul. You are a merchant who has been approached by a trader from the East with a remarkable proposal. At any moment you can take your share of the deal and walk away. But if you both agree to continue negotiating, the deal grows more valuable. The catch — at every stage, the other merchant decides next. Do you trust them to keep negotiating?`,
     quote: `In laboratory experiments, subjects almost never stop immediately — even though rational game theory predicts they should. Trust, optimism, and social instinct override cold calculation.`,
     quoteSource: "McKelvey and Palfrey, Econometrica, 1992",
     concept: "Backward Induction — Subgame Perfect Nash Equilibrium",
+  },
+  {
+    id: "travelers-dilemma",
+    title: "Traveler's Dilemma",
+    active: true,
+    gameType: "travelers_dilemma",
+    tagline: "The honest claim is never the smart claim.",
+    story: `Two travelers return from the same trip and discover their identical antique vases were both damaged by the airline. The airline asks each traveler separately to write down the value — anywhere from $4 to $8. The airline pays the lower amount to both. The traveler who wrote less gets a $1 bonus. The traveler who wrote more gets a $1 penalty. What do you claim?`,
+    quote: `The Traveler's Dilemma is striking because the logic that leads to the Nash equilibrium is sound, yet the prediction is wildly at odds with actual behavior in experiments.`,
+    quoteSource: "Kaushik Basu, Scientific American, 2007",
+    concept: "Iterated Dominance — Nash Equilibrium",
   },
 ];
 
@@ -48,12 +59,10 @@ function Landing({ onStartGame, onProfessor }) {
   const [showMatrix, setShowMatrix] = useState(false);
   const [showButton, setShowButton] = useState(false);
   const [lampAngle, setLampAngle] = useState(0);
+  const [ticketY, setTicketY] = useState(-80);
+  const [ticketRotation, setTicketRotation] = useState(-20);
 
-  const typedTitle = useTypewriter(
-    selectedGame?.title || "",
-    60,
-    animating
-  );
+  const typedTitle = useTypewriter(selectedGame?.title || "", 60, animating);
 
   useEffect(() => {
     if (!selectedGame) return;
@@ -61,6 +70,8 @@ function Landing({ onStartGame, onProfessor }) {
     setShowStory(false);
     setShowMatrix(false);
     setShowButton(false);
+    setTicketY(-80);
+    setTicketRotation(-20);
 
     setTimeout(() => setAnimating(true), 300);
     setTimeout(() => setShowStory(true), 1800);
@@ -75,34 +86,43 @@ function Landing({ onStartGame, onProfessor }) {
     let speed = 0.8;
     const interval = setInterval(() => {
       angle += direction * speed;
-      if (angle > 12 || angle < -12) {
-        direction *= -1;
-        speed *= 0.98;
-      }
+      if (angle > 12 || angle < -12) { direction *= -1; speed *= 0.98; }
       setLampAngle(angle);
     }, 16);
     return () => clearInterval(interval);
   }, [animating, selectedGame]);
 
-  const handleGameClick = (game) => {
-    if (!game.active) return;
-    setSelectedGame(game);
-  };
+  useEffect(() => {
+    if (!animating || selectedGame?.gameType !== "travelers_dilemma") return;
+    let y = -80;
+    let rotation = -20;
+    let velocity = 0;
+    const interval = setInterval(() => {
+      velocity += 1.2;
+      y += velocity;
+      rotation *= 0.92;
+      if (y >= 10) {
+        y = 10;
+        velocity = -velocity * 0.25;
+        if (Math.abs(velocity) < 0.8) { clearInterval(interval); }
+      }
+      setTicketY(y);
+      setTicketRotation(rotation);
+    }, 16);
+    return () => clearInterval(interval);
+  }, [animating, selectedGame]);
 
   const coinCount = showButton ? 6 : showMatrix ? 4 : showStory ? 2 : 1;
 
   return (
     <div style={s.page}>
-      {/* SIDEBAR */}
       <div style={s.sidebar}>
         <div style={s.sidebarTop}>
           <p style={s.appTag}>Game Theory</p>
           <h1 style={s.appName}>Lab</h1>
           <p style={s.appSub}>Interactive Learning Platform</p>
         </div>
-
         <div style={s.divider}></div>
-
         <div style={s.gameList}>
           <p style={s.listLabel}>Games</p>
           {GAMES.map((game) => (
@@ -113,28 +133,21 @@ function Landing({ onStartGame, onProfessor }) {
                 ...(selectedGame?.id === game.id ? s.gameBtnActive : {}),
                 ...(!game.active ? s.gameBtnLocked : {}),
               }}
-              onClick={() => handleGameClick(game)}
+              onClick={() => game.active && setSelectedGame(game)}
               disabled={!game.active}
             >
               <div style={s.gameBtnLeft}>
                 <span style={s.gameBtnTitle}>{game.title}</span>
                 <span style={s.gameBtnConcept}>{game.concept}</span>
               </div>
-              {selectedGame?.id === game.id && (
-                <span style={s.activeDot}></span>
-              )}
+              {selectedGame?.id === game.id && <span style={s.activeDot}></span>}
             </button>
           ))}
         </div>
-
         <div style={s.divider}></div>
-
-        <button style={s.profBtn} onClick={onProfessor}>
-          Professor Access
-        </button>
+        <button style={s.profBtn} onClick={onProfessor}>Professor Access</button>
       </div>
 
-      {/* MAIN AREA */}
       <div style={s.main}>
         {!selectedGame ? (
           <div style={s.welcomeWrap}>
@@ -151,30 +164,20 @@ function Landing({ onStartGame, onProfessor }) {
           </div>
         ) : (
           <div style={s.gamePreview}>
-
-            {/* Animation */}
-            {selectedGame.gameType === "prisoners_dilemma" ? (
+            {selectedGame.gameType === "prisoners_dilemma" && (
               <div style={s.lampWrap}>
-                <div style={{
-                  ...s.lampPivot,
-                  transform: `rotate(${lampAngle}deg)`,
-                }}>
+                <div style={{ ...s.lampPivot, transform: `rotate(${lampAngle}deg)` }}>
                   <div style={s.lampCord}></div>
                   <div style={s.lampShade}></div>
                   <div style={s.lampLight}></div>
                 </div>
               </div>
-            ) : (
+            )}
+
+            {selectedGame.gameType === "centipede" && (
               <div style={s.coinWrap}>
                 {[...Array(coinCount)].map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      ...s.coin,
-                      bottom: `${i * 18}px`,
-                      opacity: 1,
-                    }}
-                  >
+                  <div key={i} style={{ ...s.coin, bottom: `${i * 18}px` }}>
                     <span style={s.coinSign}>$</span>
                   </div>
                 ))}
@@ -182,27 +185,46 @@ function Landing({ onStartGame, onProfessor }) {
               </div>
             )}
 
-            {/* Back button */}
-            <button
-              style={s.backBtn}
-              onClick={() => {
-                setSelectedGame(null);
-                setAnimating(false);
-              }}
-            >
+            {selectedGame.gameType === "travelers_dilemma" && (
+              <div style={s.ticketWrap}>
+                <div style={{
+                  ...s.ticket,
+                  transform: `translateY(${ticketY}px) rotate(${ticketRotation}deg)`,
+                }}>
+                  <div style={s.ticketHeader}>
+                    <span style={s.ticketAirline}>✈ AMERICAN AIRLINES</span>
+                    <span style={s.ticketNum}>FL-1850</span>
+                  </div>
+                  <div style={s.ticketDash}></div>
+                  <div style={s.ticketBody}>
+                    <div style={s.ticketField}>
+                      <span style={s.ticketFieldLabel}>CLAIM VALUE</span>
+                      <span style={s.ticketFieldValue}>$4.00 — $8.00</span>
+                    </div>
+                    <div style={s.ticketField}>
+                      <span style={s.ticketFieldLabel}>REWARD / PENALTY</span>
+                      <span style={s.ticketFieldValue}>± $1.00</span>
+                    </div>
+                  </div>
+                  <div style={s.ticketDash}></div>
+                  <div style={s.ticketFooter}>
+                    <span style={s.ticketFooterText}>SUBMIT YOUR CLAIM BELOW</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button style={s.backBtn} onClick={() => { setSelectedGame(null); setAnimating(false); }}>
               ← Back
             </button>
 
-            {/* Typewriter title */}
             <div style={s.titleWrap}>
               <h2 style={s.gameTitle}>
-                {typedTitle}
-                <span style={s.cursor}>|</span>
+                {typedTitle}<span style={s.cursor}>|</span>
               </h2>
               <p style={s.gameTagline}>{selectedGame.tagline}</p>
             </div>
 
-            {/* Story fades in */}
             <div style={{
               ...s.storyCard,
               opacity: showStory ? 1 : 0,
@@ -213,7 +235,6 @@ function Landing({ onStartGame, onProfessor }) {
               <p style={s.storyText}>{selectedGame.story}</p>
             </div>
 
-            {/* Quote slides up */}
             <div style={{
               ...s.quoteCard,
               opacity: showMatrix ? 1 : 0,
@@ -224,17 +245,13 @@ function Landing({ onStartGame, onProfessor }) {
               <p style={s.quoteText}>"{selectedGame.quote}"</p>
             </div>
 
-            {/* Button pulses in */}
             <div style={{
               ...s.btnWrap,
               opacity: showButton ? 1 : 0,
               transform: showButton ? "translateY(0)" : "translateY(20px)",
               transition: "all 0.8s ease",
             }}>
-              <button
-                style={s.startBtn}
-                onClick={() => onStartGame(selectedGame)}
-              >
+              <button style={s.startBtn} onClick={() => onStartGame(selectedGame)}>
                 Enter as Student
               </button>
             </div>
@@ -243,10 +260,7 @@ function Landing({ onStartGame, onProfessor }) {
       </div>
 
       <style>{`
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
       `}</style>
     </div>
   );
@@ -260,8 +274,8 @@ const s = {
     fontFamily: "'Segoe UI', system-ui, sans-serif",
   },
   sidebar: {
-    width: "280px",
-    minWidth: "280px",
+    width: "290px",
+    minWidth: "290px",
     backgroundColor: "#0a0a0a",
     borderRight: "1px solid #1f1f1f",
     display: "flex",
@@ -275,7 +289,7 @@ const s = {
     marginBottom: "24px",
   },
   appTag: {
-    fontSize: "11px",
+    fontSize: "12px",
     color: "#c0392b",
     textTransform: "uppercase",
     letterSpacing: "3px",
@@ -283,7 +297,7 @@ const s = {
     fontWeight: "700",
   },
   appName: {
-    fontSize: "48px",
+    fontSize: "52px",
     color: "#ffffff",
     margin: 0,
     fontWeight: "900",
@@ -291,8 +305,8 @@ const s = {
     lineHeight: "1",
   },
   appSub: {
-    fontSize: "11px",
-    color: "#444",
+    fontSize: "12px",
+    color: "#555",
     margin: 0,
     marginTop: "6px",
   },
@@ -308,8 +322,8 @@ const s = {
     flex: 1,
   },
   listLabel: {
-    fontSize: "10px",
-    color: "#444",
+    fontSize: "11px",
+    color: "#555",
     textTransform: "uppercase",
     letterSpacing: "2px",
     margin: "0 0 8px 0",
@@ -339,20 +353,20 @@ const s = {
   gameBtnLeft: {
     display: "flex",
     flexDirection: "column",
-    gap: "4px",
+    gap: "5px",
   },
   gameBtnTitle: {
-    fontSize: "14px",
+    fontSize: "15px",
     color: "#ffffff",
     fontWeight: "700",
   },
   gameBtnConcept: {
-    fontSize: "11px",
-    color: "#555",
+    fontSize: "12px",
+    color: "#666",
   },
   activeDot: {
-    width: "6px",
-    height: "6px",
+    width: "7px",
+    height: "7px",
     borderRadius: "50%",
     backgroundColor: "#c0392b",
     flexShrink: 0,
@@ -364,7 +378,7 @@ const s = {
     border: "none",
     backgroundColor: "#c0392b",
     color: "#ffffff",
-    fontSize: "14px",
+    fontSize: "15px",
     cursor: "pointer",
     fontWeight: "700",
     marginTop: "8px",
@@ -378,14 +392,14 @@ const s = {
     overflowY: "auto",
   },
   welcomeWrap: {
-    maxWidth: "600px",
+    maxWidth: "620px",
     width: "100%",
     display: "flex",
     flexDirection: "column",
-    gap: "24px",
+    gap: "28px",
   },
   welcomeTag: {
-    fontSize: "12px",
+    fontSize: "13px",
     color: "#c0392b",
     textTransform: "uppercase",
     letterSpacing: "3px",
@@ -393,7 +407,7 @@ const s = {
     fontWeight: "700",
   },
   welcomeTitle: {
-    fontSize: "80px",
+    fontSize: "84px",
     color: "#ffffff",
     margin: 0,
     fontWeight: "900",
@@ -401,8 +415,8 @@ const s = {
     lineHeight: "1",
   },
   welcomeDesc: {
-    fontSize: "18px",
-    color: "#555",
+    fontSize: "19px",
+    color: "#cccccc",
     lineHeight: "1.8",
     margin: 0,
   },
@@ -413,25 +427,27 @@ const s = {
     marginTop: "8px",
   },
   hintArrow: {
-    fontSize: "20px",
+    fontSize: "22px",
     color: "#c0392b",
   },
   hintText: {
-    fontSize: "14px",
-    color: "#333",
+    fontSize: "15px",
+    color: "#555",
     fontStyle: "italic",
   },
   gamePreview: {
-    maxWidth: "680px",
+    maxWidth: "700px",
     width: "100%",
     display: "flex",
     flexDirection: "column",
     gap: "24px",
   },
+
+  // LAMP
   lampWrap: {
     display: "flex",
     justifyContent: "center",
-    height: "100px",
+    height: "110px",
     position: "relative",
     marginBottom: "-10px",
   },
@@ -443,25 +459,23 @@ const s = {
     position: "absolute",
     top: 0,
   },
-  lampCord: {
-    width: "2px",
-    height: "50px",
-    backgroundColor: "#333",
-  },
+  lampCord: { width: "2px", height: "55px", backgroundColor: "#444" },
   lampShade: {
-    width: "50px",
+    width: "56px",
     height: "0",
-    borderLeft: "25px solid transparent",
-    borderRight: "25px solid transparent",
-    borderTop: "32px solid #2a2a2a",
+    borderLeft: "28px solid transparent",
+    borderRight: "28px solid transparent",
+    borderTop: "36px solid #2a2a2a",
   },
   lampLight: {
-    width: "70px",
-    height: "35px",
-    borderRadius: "0 0 35px 35px",
-    background: "radial-gradient(ellipse at top, rgba(255,220,100,0.12) 0%, transparent 70%)",
+    width: "80px",
+    height: "40px",
+    borderRadius: "0 0 40px 40px",
+    background: "radial-gradient(ellipse at top, rgba(255,220,100,0.15) 0%, transparent 70%)",
     marginTop: "-4px",
   },
+
+  // COINS
   coinWrap: {
     position: "relative",
     height: "140px",
@@ -472,8 +486,8 @@ const s = {
   },
   coin: {
     position: "absolute",
-    width: "64px",
-    height: "64px",
+    width: "68px",
+    height: "68px",
     borderRadius: "50%",
     background: "radial-gradient(circle at 35% 35%, #f5d76e, #c9922a 60%, #8a5e0a)",
     border: "3px solid #f0c040",
@@ -484,49 +498,129 @@ const s = {
     justifyContent: "center",
   },
   coinSign: {
-    fontSize: "22px",
+    fontSize: "24px",
     fontWeight: "900",
     color: "rgba(255,255,255,0.55)",
     textShadow: "0 1px 2px rgba(0,0,0,0.5)",
     userSelect: "none",
-    lineHeight: "1",
   },
   coinGlow: {
     position: "absolute",
     bottom: "-8px",
-    width: "90px",
-    height: "16px",
+    width: "100px",
+    height: "18px",
     borderRadius: "50%",
     background: "radial-gradient(ellipse, rgba(240,192,64,0.25) 0%, transparent 70%)",
   },
+
+  // TICKET
+  ticketWrap: {
+    height: "160px",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    position: "relative",
+    marginBottom: "-10px",
+  },
+  ticket: {
+    position: "absolute",
+    top: 0,
+    width: "240px",
+    backgroundColor: "#1a1a1a",
+    border: "1px solid #3a3a3a",
+    borderRadius: "10px",
+    overflow: "hidden",
+    boxShadow: "0 12px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(192,57,43,0.2)",
+  },
+  ticketHeader: {
+    backgroundColor: "#c0392b",
+    padding: "10px 16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  ticketAirline: {
+    fontSize: "11px",
+    color: "#ffffff",
+    fontWeight: "800",
+    letterSpacing: "1px",
+    textTransform: "uppercase",
+  },
+  ticketNum: {
+    fontSize: "10px",
+    color: "rgba(255,255,255,0.6)",
+    letterSpacing: "1px",
+  },
+  ticketDash: {
+    height: "1px",
+    margin: "0 16px",
+    backgroundImage: "repeating-linear-gradient(to right, #333 0, #333 6px, transparent 6px, transparent 12px)",
+  },
+  ticketBody: {
+    padding: "12px 16px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+  ticketField: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  ticketFieldLabel: {
+    fontSize: "9px",
+    color: "#666",
+    textTransform: "uppercase",
+    letterSpacing: "1px",
+    fontWeight: "700",
+  },
+  ticketFieldValue: {
+    fontSize: "14px",
+    color: "#f0b429",
+    fontWeight: "900",
+    letterSpacing: "0.5px",
+  },
+  ticketFooter: {
+    backgroundColor: "#111",
+    padding: "8px 16px",
+    textAlign: "center",
+  },
+  ticketFooterText: {
+    fontSize: "9px",
+    color: "#444",
+    textTransform: "uppercase",
+    letterSpacing: "2px",
+    fontWeight: "700",
+  },
+
   backBtn: {
     alignSelf: "flex-start",
     padding: "10px 20px",
     borderRadius: "6px",
     border: "1.5px solid #2a2a2a",
     backgroundColor: "transparent",
-    color: "#666",
-    fontSize: "13px",
+    color: "#888",
+    fontSize: "14px",
     cursor: "pointer",
     fontWeight: "600",
   },
   titleWrap: {
     display: "flex",
     flexDirection: "column",
-    gap: "8px",
+    gap: "10px",
   },
   gameTitle: {
-    fontSize: "52px",
+    fontSize: "56px",
     color: "#ffffff",
     margin: 0,
     fontWeight: "900",
     letterSpacing: "-1.5px",
     lineHeight: "1.1",
-    minHeight: "65px",
+    minHeight: "70px",
   },
   gameTagline: {
-    fontSize: "16px",
-    color: "#555",
+    fontSize: "18px",
+    color: "#888",
     margin: 0,
     fontStyle: "italic",
   },
@@ -543,16 +637,16 @@ const s = {
     borderRadius: "8px",
   },
   storyLabel: {
-    fontSize: "10px",
+    fontSize: "11px",
     color: "#c0392b",
     textTransform: "uppercase",
     letterSpacing: "2px",
-    margin: "0 0 12px 0",
+    margin: "0 0 14px 0",
     fontWeight: "700",
   },
   storyText: {
-    fontSize: "15px",
-    color: "#aaaaaa",
+    fontSize: "17px",
+    color: "#dddddd",
     lineHeight: "1.9",
     margin: 0,
   },
@@ -563,16 +657,16 @@ const s = {
     borderRadius: "8px",
   },
   quoteLabel: {
-    fontSize: "10px",
-    color: "#444",
+    fontSize: "11px",
+    color: "#555",
     textTransform: "uppercase",
     letterSpacing: "2px",
-    margin: "0 0 10px 0",
+    margin: "0 0 12px 0",
     fontWeight: "700",
   },
   quoteText: {
-    fontSize: "14px",
-    color: "#555",
+    fontSize: "16px",
+    color: "#888",
     fontStyle: "italic",
     lineHeight: "1.8",
     margin: 0,
@@ -588,7 +682,7 @@ const s = {
     border: "none",
     backgroundColor: "#c0392b",
     color: "#ffffff",
-    fontSize: "17px",
+    fontSize: "18px",
     cursor: "pointer",
     fontWeight: "800",
     alignSelf: "flex-start",

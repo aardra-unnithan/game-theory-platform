@@ -36,19 +36,28 @@ game_settings = {
             "both_testify": {"student": 2, "ai": 2},
         },
         "session_code": None,
-        "active": False
     },
     "centipede": {
         "total_stages": 4,
         "agent_type": "rational",
         "session_code": None,
-        "active": False,
         "initial_payoff_high": 0.40,
         "initial_payoff_low": 0.10,
         "multiplier": 2
+    },
+    "travelers_dilemma": {
+        "total_rounds": 5,
+        "agent_type": "rational",
+        "session_code": None,
+        "min_claim": 4.0,
+        "max_claim": 8.0,
+        "increment": 0.5,
+        "penalty_reward": 1.0
     }
 }
 
+
+# --- MODELS ---
 
 class JoinGame(BaseModel):
     student_name: str
@@ -62,6 +71,10 @@ class PDMoveRequest(BaseModel):
 class CentipedeMoveRequest(BaseModel):
     session_id: str
     student_move: str
+
+class TravelerMoveRequest(BaseModel):
+    session_id: str
+    student_claim: float
 
 class HintRequest(BaseModel):
     session_id: str
@@ -78,6 +91,13 @@ class CentipedeSettingsUpdate(BaseModel):
     initial_payoff_low: float = None
     multiplier: float = None
 
+class TravelerSettingsUpdate(BaseModel):
+    total_rounds: int = None
+    agent_type: str = None
+    min_claim: float = None
+    max_claim: float = None
+    penalty_reward: float = None
+
 class PayoffUpdate(BaseModel):
     both_silence_student: int
     both_silence_ai: int
@@ -91,6 +111,8 @@ class PayoffUpdate(BaseModel):
 class SessionCodeRequest(BaseModel):
     game_type: str
 
+
+# --- HELPERS ---
 
 def generate_session_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -111,10 +133,30 @@ def get_final_centipede_payoffs(settings: dict, total_stages: int = 4) -> dict:
     return {"student": round(high, 2), "ai": round(low, 2)}
 
 
+def get_traveler_payoff(student_claim: float, ai_claim: float, penalty_reward: float) -> dict:
+    if student_claim == ai_claim:
+        return {"student": round(student_claim, 2), "ai": round(ai_claim, 2)}
+    lower = min(student_claim, ai_claim)
+    if student_claim < ai_claim:
+        return {
+            "student": round(lower + penalty_reward, 2),
+            "ai": round(lower - penalty_reward, 2)
+        }
+    else:
+        return {
+            "student": round(lower - penalty_reward, 2),
+            "ai": round(lower + penalty_reward, 2)
+        }
+
+
+# --- ROOT ---
+
 @app.get("/")
 def root():
     return {"message": "Game Theory Platform is running"}
 
+
+# --- JOIN ---
 
 @app.post("/join")
 def join_game(data: JoinGame):
@@ -177,6 +219,38 @@ def join_game(data: JoinGame):
             "total_stages": settings["total_stages"]
         }
 
+    elif data.game_type == "travelers_dilemma":
+        sessions[session_id] = {
+            "session_id": session_id,
+            "game_type": "travelers_dilemma",
+            "student_name": data.student_name,
+            "joined_at": str(datetime.datetime.now()),
+            "game_status": "playing",
+            "moves": [],
+            "total_student_score": 0,
+            "total_ai_score": 0,
+            "current_round": 1,
+            "total_rounds": settings["total_rounds"],
+            "agent_type": settings["agent_type"],
+            "min_claim": settings["min_claim"],
+            "max_claim": settings["max_claim"],
+            "increment": settings["increment"],
+            "penalty_reward": settings["penalty_reward"],
+            "hint": None
+        }
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message": f"Welcome {data.student_name}!",
+            "total_rounds": settings["total_rounds"],
+            "min_claim": settings["min_claim"],
+            "max_claim": settings["max_claim"],
+            "increment": settings["increment"],
+            "penalty_reward": settings["penalty_reward"]
+        }
+
+
+# --- PRISONER'S DILEMMA ---
 
 def get_pd_payoff(student_move: str, ai_move: str, payoff_matrix: dict) -> dict:
     if student_move == "testify" and ai_move == "testify":
@@ -206,15 +280,15 @@ Payoff matrix:
         prompt = f"""You are an AI playing Prisoner's Dilemma using rational game theory.
 {payoff_info}
 History: {history_text}
-Play rationally to maximize your score.
+Play rationally to maximize your score. Testify is the dominant strategy.
 Respond with ONLY this exact JSON on one line:
 {{"move": "silence", "reasoning": "brief reason"}} or {{"move": "testify", "reasoning": "brief reason"}}"""
 
     elif agent_type == "adaptive":
-        prompt = f"""You are an AI playing Prisoner's Dilemma. Study the student's pattern and adapt.
+        prompt = f"""You are an AI playing Prisoner's Dilemma like a human would.
 {payoff_info}
 History: {history_text}
-Analyze the student's pattern and decide based on what maximizes your score.
+Play like a human — start cooperatively, build trust, reciprocate what the student does. Humans tend to stay silent more than game theory predicts. Mirror the student's behavior with a slight cooperative bias.
 Respond with ONLY this exact JSON on one line:
 {{"move": "silence", "reasoning": "brief reason"}} or {{"move": "testify", "reasoning": "brief reason"}}"""
 
@@ -222,7 +296,7 @@ Respond with ONLY this exact JSON on one line:
         prompt = f"""You are playing a game. Two players choose silence or testify simultaneously.
 {payoff_info}
 History: {history_text}
-Make your decision based purely on the situation.
+Make your decision based purely on the situation with no strategic guidance.
 Respond with ONLY this exact JSON on one line:
 {{"move": "silence", "reasoning": "brief reason"}} or {{"move": "testify", "reasoning": "brief reason"}}"""
 
@@ -233,7 +307,6 @@ Respond with ONLY this exact JSON on one line:
     )
 
     response_text = response.content[0].text.strip()
-
     if not response_text:
         return "testify", "Default rational choice"
 
@@ -333,6 +406,8 @@ Write 3 sentences analyzing this student's performance. Reference dominant strat
     return response.content[0].text.strip()
 
 
+# --- CENTIPEDE ---
+
 def get_centipede_ai_move(session: dict) -> tuple:
     current_stage = session["current_stage"]
     total_stages = session["total_stages"]
@@ -369,13 +444,13 @@ Respond with ONLY this exact JSON on one line:
 {{"move": "stop", "reasoning": "brief reason"}} or {{"move": "continue", "reasoning": "brief reason"}}"""
 
     elif agent_type == "adaptive":
-        prompt = f"""You are an AI playing the Centipede Game as Player B. Study the student's pattern.
+        prompt = f"""You are an AI playing the Centipede Game as Player B like a human would.
 Current stage: {current_stage} of {total_stages}. It is YOUR turn as Player B.
 Payoff table:
 {chr(10).join(payoff_table)}
 Game history:
 {history_text}
-Analyze the student's pattern and decide your move.
+Play like a human — humans almost never stop early. They tend to continue longer than rational theory predicts, driven by trust and optimism. Mirror the student's cooperative behavior and continue unless the student has been stopping early.
 Respond with ONLY this exact JSON on one line:
 {{"move": "stop", "reasoning": "brief reason"}} or {{"move": "continue", "reasoning": "brief reason"}}"""
 
@@ -546,6 +621,202 @@ Write 3 sentences analyzing this student's performance. Reference backward induc
     return response.content[0].text.strip()
 
 
+# --- TRAVELER'S DILEMMA ---
+
+def get_traveler_ai_claim(moves_history: list, agent_type: str, session: dict) -> tuple:
+    min_claim = session["min_claim"]
+    max_claim = session["max_claim"]
+    increment = session["increment"]
+    penalty_reward = session["penalty_reward"]
+
+    history_text = "This is the first round." if not moves_history else "\n".join(
+        [f"Round {i+1}: Student claimed ${m['student_claim']}, AI claimed ${m['ai_claim']}. Student earned ${m['student_payoff']}, AI earned ${m['ai_payoff']}."
+         for i, m in enumerate(moves_history)]
+    )
+
+    claims = []
+    c = min_claim
+    while c <= max_claim:
+        claims.append(f"${c:.2f}")
+        c += increment
+    valid_claims = ", ".join(claims)
+
+    if agent_type == "rational":
+        prompt = f"""You are an AI playing the Traveler's Dilemma using iterated dominance reasoning.
+
+Rules:
+- Both you and the student independently choose a claim between ${min_claim} and ${max_claim} in ${increment} increments
+- Both receive the LOWER of the two claims
+- The lower claimer gets +${penalty_reward} reward
+- The higher claimer gets -${penalty_reward} penalty
+- If claims are equal both receive that amount
+
+Valid claims: {valid_claims}
+
+History:
+{history_text}
+
+Rational strategy: use iterated dominance — there is always incentive to undercut by ${increment}. Play toward the minimum claim of ${min_claim}.
+
+Respond with ONLY this exact JSON on one line:
+{{"claim": 4.0, "reasoning": "brief reason"}}"""
+
+    elif agent_type == "adaptive":
+        prompt = f"""You are an AI playing the Traveler's Dilemma like a human would.
+
+Rules:
+- Both you and the student independently choose a claim between ${min_claim} and ${max_claim} in ${increment} increments
+- Both receive the LOWER of the two claims
+- The lower claimer gets +${penalty_reward} reward
+- The higher claimer gets -${penalty_reward} penalty
+- If claims are equal both receive that amount
+
+Valid claims: {valid_claims}
+
+History:
+{history_text}
+
+Play like a human — humans typically claim much higher than the Nash equilibrium of ${min_claim}. They often claim around the middle or high range. Mirror what the student is doing with a slight upward bias toward higher claims. Be cooperative and trusting.
+
+Respond with ONLY this exact JSON on one line:
+{{"claim": 7.0, "reasoning": "brief reason"}}"""
+
+    else:
+        prompt = f"""You are playing the Traveler's Dilemma. Choose a claim amount.
+
+Rules:
+- Both you and the student independently choose a claim between ${min_claim} and ${max_claim} in ${increment} increments
+- Both receive the LOWER of the two claims
+- The lower claimer gets +${penalty_reward} reward
+- The higher claimer gets -${penalty_reward} penalty
+
+Valid claims: {valid_claims}
+
+History:
+{history_text}
+
+Make your decision freely with no strategic guidance.
+
+Respond with ONLY this exact JSON on one line:
+{{"claim": 6.0, "reasoning": "brief reason"}}"""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=150,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    response_text = response.content[0].text.strip()
+
+    if not response_text:
+        return min_claim, "Default minimum claim"
+
+    if "```" in response_text:
+        parts = response_text.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("{"):
+                response_text = part
+                break
+
+    try:
+        parsed = json.loads(response_text)
+        claim = float(parsed["claim"])
+        # Validate and round to nearest increment
+        claim = max(min_claim, min(max_claim, claim))
+        claim = round(round(claim / increment) * increment, 2)
+        return claim, parsed.get("reasoning", "AI made a claim")
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return min_claim, "AI chose minimum claim"
+
+
+@app.post("/move/travelers")
+def travelers_move(data: TravelerMoveRequest):
+    session = sessions.get(data.session_id)
+    if not session or session["game_type"] != "travelers_dilemma":
+        return {"success": False, "message": "Session not found"}
+
+    td_settings = game_settings["travelers_dilemma"]
+    session["agent_type"] = td_settings["agent_type"]
+    session["penalty_reward"] = td_settings["penalty_reward"]
+
+    student_claim = round(data.student_claim, 2)
+    ai_claim, ai_reasoning = get_traveler_ai_claim(
+        session["moves"], session["agent_type"], session
+    )
+
+    payoff = get_traveler_payoff(student_claim, ai_claim, session["penalty_reward"])
+
+    move_record = {
+        "round": session["current_round"],
+        "student_claim": student_claim,
+        "ai_claim": ai_claim,
+        "ai_reasoning": ai_reasoning,
+        "student_payoff": payoff["student"],
+        "ai_payoff": payoff["ai"]
+    }
+
+    session["moves"].append(move_record)
+    session["total_student_score"] = round(session["total_student_score"] + payoff["student"], 2)
+    session["total_ai_score"] = round(session["total_ai_score"] + payoff["ai"], 2)
+    session["current_round"] += 1
+
+    game_over = session["current_round"] > session["total_rounds"]
+    analysis = None
+
+    if game_over:
+        session["game_status"] = "complete"
+        analysis = get_traveler_analysis(session)
+        session["analysis"] = analysis
+
+    return {
+        "success": True,
+        "ai_claim": ai_claim,
+        "ai_reasoning": ai_reasoning,
+        "student_payoff": payoff["student"],
+        "ai_payoff": payoff["ai"],
+        "total_student_score": session["total_student_score"],
+        "total_ai_score": session["total_ai_score"],
+        "game_over": game_over,
+        "analysis": analysis,
+        "round": move_record["round"],
+        "total_rounds": session["total_rounds"]
+    }
+
+
+def get_traveler_analysis(session: dict) -> str:
+    moves = session["moves"]
+    history = "\n".join([
+        f"Round {m['round']}: Student claimed ${m['student_claim']}, AI claimed ${m['ai_claim']}. Student earned ${m['student_payoff']}."
+        for m in moves
+    ])
+    avg_claim = sum(m["student_claim"] for m in moves) / len(moves) if moves else 0
+
+    prompt = f"""You are a game theory professor analyzing a student's Traveler's Dilemma performance.
+Student: {session['student_name']}
+Total rounds: {session['total_rounds']}
+Student total earnings: ${session['total_student_score']}
+AI total earnings: ${session['total_ai_score']}
+Student average claim: ${avg_claim:.2f}
+Claim range: ${session['min_claim']} to ${session['max_claim']}
+Nash Equilibrium prediction: ${session['min_claim']} (minimum claim)
+History:
+{history}
+
+Write 3 sentences analyzing this student's performance. Reference iterated dominance reasoning — the Nash equilibrium predicts claiming the minimum but humans consistently claim higher. Explain what the student's average claim reveals about their strategic thinking versus the theory. Write directly to the student. No markdown, plain prose only."""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text.strip()
+
+
+# --- HINTS ---
+
 @app.post("/professor/hint")
 def send_hint(data: HintRequest):
     session = sessions.get(data.session_id)
@@ -573,11 +844,14 @@ def broadcast(data: HintRequest):
     return {"success": True}
 
 
+# --- PROFESSOR STATS ---
+
 @app.get("/professor/stats")
 def get_stats():
     all_sessions = list(sessions.values())
     pd_sessions = [s for s in all_sessions if s["game_type"] == "prisoners_dilemma"]
     centipede_sessions = [s for s in all_sessions if s["game_type"] == "centipede"]
+    td_sessions = [s for s in all_sessions if s["game_type"] == "travelers_dilemma"]
 
     pd_cooperate = sum(1 for s in pd_sessions for m in s["moves"] if m["student_move"] == "silence")
     pd_defect = sum(1 for s in pd_sessions for m in s["moves"] if m["student_move"] == "testify")
@@ -593,6 +867,13 @@ def get_stats():
         if m.get("mover") == "Student (A)" and m["move"] == "continue"
     )
 
+    td_avg_claim = 0
+    td_total_moves = sum(len(s["moves"]) for s in td_sessions)
+    if td_total_moves > 0:
+        td_avg_claim = sum(
+            m["student_claim"] for s in td_sessions for m in s["moves"]
+        ) / td_total_moves
+
     return {
         "total_students": len(all_sessions),
         "prisoners_dilemma": {
@@ -605,9 +886,16 @@ def get_stats():
             "total_stop": centipede_stop,
             "total_continue": centipede_continue
         },
+        "travelers_dilemma": {
+            "sessions": td_sessions,
+            "avg_claim": round(td_avg_claim, 2),
+            "total_moves": td_total_moves
+        },
         "game_settings": game_settings
     }
 
+
+# --- PROFESSOR SETTINGS ---
 
 @app.post("/professor/settings/pd")
 def update_pd_settings(data: PDSettingsUpdate):
@@ -633,25 +921,28 @@ def update_centipede_settings(data: CentipedeSettingsUpdate):
     return {"success": True, "settings": game_settings["centipede"]}
 
 
+@app.post("/professor/settings/travelers")
+def update_travelers_settings(data: TravelerSettingsUpdate):
+    if data.total_rounds is not None:
+        game_settings["travelers_dilemma"]["total_rounds"] = data.total_rounds
+    if data.agent_type is not None:
+        game_settings["travelers_dilemma"]["agent_type"] = data.agent_type
+    if data.min_claim is not None:
+        game_settings["travelers_dilemma"]["min_claim"] = data.min_claim
+    if data.max_claim is not None:
+        game_settings["travelers_dilemma"]["max_claim"] = data.max_claim
+    if data.penalty_reward is not None:
+        game_settings["travelers_dilemma"]["penalty_reward"] = data.penalty_reward
+    return {"success": True, "settings": game_settings["travelers_dilemma"]}
+
+
 @app.post("/professor/payoff/pd")
 def update_pd_payoff(data: PayoffUpdate):
     game_settings["prisoners_dilemma"]["payoff_matrix"] = {
-        "both_silence": {
-            "student": data.both_silence_student,
-            "ai": data.both_silence_ai
-        },
-        "student_testify_ai_silence": {
-            "student": data.student_testify_ai_silence_student,
-            "ai": data.student_testify_ai_silence_ai
-        },
-        "student_silence_ai_testify": {
-            "student": data.student_silence_ai_testify_student,
-            "ai": data.student_silence_ai_testify_ai
-        },
-        "both_testify": {
-            "student": data.both_testify_student,
-            "ai": data.both_testify_ai
-        }
+        "both_silence": {"student": data.both_silence_student, "ai": data.both_silence_ai},
+        "student_testify_ai_silence": {"student": data.student_testify_ai_silence_student, "ai": data.student_testify_ai_silence_ai},
+        "student_silence_ai_testify": {"student": data.student_silence_ai_testify_student, "ai": data.student_silence_ai_testify_ai},
+        "both_testify": {"student": data.both_testify_student, "ai": data.both_testify_ai}
     }
     return {"success": True}
 

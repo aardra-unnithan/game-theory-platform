@@ -2,8 +2,10 @@ import { useState } from "react";
 import Landing from "./Landing";
 import Game from "./Game";
 import CentipedeGame from "./CentipedeGame";
+import TravelersGame from "./TravelersGame";
 import Results from "./Results";
 import CentipedeResults from "./CentipedeResults";
+import TravelersResults from "./TravelersResults";
 import Dashboard from "./Dashboard";
 
 const API = "http://192.168.1.114:8000";
@@ -16,6 +18,12 @@ function App() {
   const [gameData, setGameData] = useState(null);
   const [totalRounds, setTotalRounds] = useState(5);
   const [totalStages, setTotalStages] = useState(4);
+  const [travelerSettings, setTravelerSettings] = useState({
+    minClaim: 4.0,
+    maxClaim: 8.0,
+    increment: 0.5,
+    penaltyReward: 1.0
+  });
   const [profError, setProfError] = useState("");
 
   const PROF_PASSWORD = "DrPal@26";
@@ -44,6 +52,14 @@ function App() {
       setSessionId(data.session_id);
       if (data.total_rounds) setTotalRounds(data.total_rounds);
       if (data.total_stages) setTotalStages(data.total_stages);
+      if (data.min_claim !== undefined) {
+        setTravelerSettings({
+          minClaim: data.min_claim,
+          maxClaim: data.max_claim,
+          increment: data.increment,
+          penaltyReward: data.penalty_reward
+        });
+      }
       setPage("game");
     } else {
       return data.message;
@@ -105,6 +121,22 @@ function App() {
         />
       );
     }
+    if (selectedGame?.gameType === "travelers_dilemma") {
+      return (
+        <TravelersGame
+          studentName={studentName}
+          sessionId={sessionId}
+          totalRounds={totalRounds}
+          minClaim={travelerSettings.minClaim}
+          maxClaim={travelerSettings.maxClaim}
+          increment={travelerSettings.increment}
+          penaltyReward={travelerSettings.penaltyReward}
+          onComplete={handleGameComplete}
+          onBack={handleBack}
+          api={API}
+        />
+      );
+    }
     return (
       <Game
         studentName={studentName}
@@ -123,6 +155,18 @@ function App() {
         <CentipedeResults
           studentName={studentName}
           gameData={gameData}
+          onPlayAgain={() => setPage("intro")}
+          onBack={handleBack}
+        />
+      );
+    }
+    if (selectedGame?.gameType === "travelers_dilemma") {
+      return (
+        <TravelersResults
+          studentName={studentName}
+          moves={gameData.moves}
+          totalScore={gameData.totalScore}
+          analysis={gameData.analysis}
           onPlayAgain={() => setPage("intro")}
           onBack={handleBack}
         />
@@ -202,9 +246,9 @@ function IntroPage({ game, onJoin, onBack }) {
             <div style={s.centipedeInfo}>
               <p style={s.infoTitle}>How it works</p>
               <p style={s.infoText}>
-                You are Player A and go first. Each stage you choose Stop or
-                Continue. If you Continue, the AI decides next. Payoffs grow
-                each stage but whoever Stops gets the bigger share right now.
+                You are Player A and go first. Each stage choose Stop or
+                Continue. If you Continue, the AI decides next. Payoffs
+                grow each stage but whoever Stops gets the bigger share.
               </p>
               <div style={s.stageGrid}>
                 <div style={s.stageItem}>
@@ -222,6 +266,35 @@ function IntroPage({ game, onJoin, onBack }) {
                 <div style={s.stageItem}>
                   <p style={s.stageNum}>Stage 4</p>
                   <p style={s.stagePayoff}>AI stops: $0.80 / $3.20</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {game.gameType === "travelers_dilemma" && (
+            <div style={s.centipedeInfo}>
+              <p style={s.infoTitle}>How it works</p>
+              <p style={s.infoText}>
+                You and the AI each choose a claim between $4.00 and $8.00
+                simultaneously. Both receive the lower claim. The lower
+                claimer gets a $1.00 reward. The higher claimer gets a
+                $1.00 penalty. If equal, both get that amount.
+              </p>
+              <div style={s.stageGrid}>
+                <div style={s.stageItem}>
+                  <p style={s.stageNum}>Equal Claims</p>
+                  <p style={s.stagePayoff}>Both earn that amount</p>
+                </div>
+                <div style={s.stageItem}>
+                  <p style={s.stageNum}>You Lower</p>
+                  <p style={s.stagePayoff}>Your claim + $1 reward</p>
+                </div>
+                <div style={s.stageItem}>
+                  <p style={s.stageNum}>AI Lower</p>
+                  <p style={s.stagePayoff}>AI claim - $1 penalty</p>
+                </div>
+                <div style={s.stageItem}>
+                  <p style={s.stageNum}>Nash Eq.</p>
+                  <p style={s.stagePayoff}>Both claim $4.00</p>
                 </div>
               </div>
             </div>
@@ -328,7 +401,7 @@ const s = {
     gap: "20px",
   },
   eyebrow: {
-    fontSize: "11px",
+    fontSize: "12px",
     color: "#c0392b",
     textTransform: "uppercase",
     letterSpacing: "3px",
@@ -336,7 +409,7 @@ const s = {
     fontWeight: "700",
   },
   title: {
-    fontSize: "48px",
+    fontSize: "52px",
     color: "#ffffff",
     margin: 0,
     fontWeight: "900",
@@ -344,8 +417,8 @@ const s = {
     letterSpacing: "-1px",
   },
   desc: {
-    fontSize: "16px",
-    color: "#aaaaaa",
+    fontSize: "18px",
+    color: "#cccccc",
     lineHeight: "1.8",
     margin: 0,
   },
@@ -362,14 +435,14 @@ const s = {
     textAlign: "center",
   },
   dealNumber: {
-    fontSize: "28px",
+    fontSize: "30px",
     fontWeight: "900",
     color: "#c0392b",
     margin: "0 0 4px 0",
   },
   dealLabel: {
-    fontSize: "12px",
-    color: "#888",
+    fontSize: "13px",
+    color: "#999",
     margin: 0,
   },
   centipedeInfo: {
@@ -386,8 +459,8 @@ const s = {
     fontWeight: "700",
   },
   infoText: {
-    fontSize: "15px",
-    color: "#aaaaaa",
+    fontSize: "17px",
+    color: "#cccccc",
     lineHeight: "1.8",
     margin: 0,
   },
@@ -412,8 +485,8 @@ const s = {
     letterSpacing: "1px",
   },
   stagePayoff: {
-    fontSize: "13px",
-    color: "#888",
+    fontSize: "14px",
+    color: "#999",
     margin: 0,
   },
   input: {
@@ -422,7 +495,7 @@ const s = {
     border: "1px solid #333",
     backgroundColor: "#1a1a1a",
     color: "#ffffff",
-    fontSize: "16px",
+    fontSize: "17px",
     fontFamily: "'Segoe UI', system-ui, sans-serif",
     outline: "none",
   },
@@ -432,36 +505,35 @@ const s = {
     border: "1px solid #222",
     backgroundColor: "#141414",
     color: "#888",
-    fontSize: "14px",
+    fontSize: "15px",
     fontFamily: "'Segoe UI', system-ui, sans-serif",
     outline: "none",
   },
   primaryBtn: {
     width: "100%",
-    padding: "16px",
+    padding: "17px",
     borderRadius: "8px",
     border: "none",
     backgroundColor: "#c0392b",
     color: "#ffffff",
-    fontSize: "16px",
+    fontSize: "17px",
     cursor: "pointer",
     fontWeight: "700",
   },
   backBtn: {
     width: "100%",
-    padding: "14px",
+    padding: "15px",
     borderRadius: "8px",
     border: "1px solid #333",
     backgroundColor: "transparent",
     color: "#888",
-    fontSize: "14px",
+    fontSize: "15px",
     cursor: "pointer",
   },
   errorText: {
     color: "#c0392b",
-    fontSize: "14px",
+    fontSize: "15px",
     margin: 0,
   },
 };
-
 export default App;
