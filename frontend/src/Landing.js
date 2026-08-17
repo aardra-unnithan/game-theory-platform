@@ -99,7 +99,7 @@ function Landing({ onStartGame, onProfessor }) {
     setTicketY(-80);
     setTicketRotation(-20);
     setCarX(200);
-    setWatchRotation(0);
+    
     setHammerAngle(-45);
     setPaddleY(100);
 
@@ -162,7 +162,7 @@ function Landing({ onStartGame, onProfessor }) {
 
     // Smooth watch rotation
     const watchInterval = setInterval(() => {
-      setWatchRotation(prev => (prev + 0.5) % 360);
+      
     }, 16);
 
     // Hammer fall animation
