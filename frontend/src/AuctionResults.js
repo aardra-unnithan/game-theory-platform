@@ -3,7 +3,7 @@ function AuctionResults({ studentName, moves, totalProfit, analysis, onPlayAgain
   const overbids = moves.filter(m => m.bidStrategy === "overbid").length;
   const underbids = moves.filter(m => m.bidStrategy === "underbid").length;
   const lotsWon = moves.filter(m => m.winner === "student").length;
-  const profitableLots = moves.filter(m => m.studentProfit > 0).length;
+  
 
   return (
     <div style={s.page}>

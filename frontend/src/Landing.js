@@ -84,7 +84,7 @@ function Landing({ onStartGame, onProfessor }) {
   const [ticketY, setTicketY] = useState(-80);
   const [ticketRotation, setTicketRotation] = useState(-20);
   const [carX, setCarX] = useState(200);
-  const [watchRotation, setWatchRotation] = useState(0);
+  
   const [hammerAngle, setHammerAngle] = useState(-45);
   const [paddleY, setPaddleY] = useState(100);
 

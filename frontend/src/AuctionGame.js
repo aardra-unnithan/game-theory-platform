@@ -50,7 +50,7 @@ function AuctionGame({ studentName, sessionId, totalRounds, minValue, maxValue, 
       { name: "Vacheron Constantin Historiques", desc: "Reference 82035 in rose gold. Part of the original 1955 American collection." },
     ];
     setCurrentWatch(watches[(round - 1) % watches.length]);
-  }, [round]);
+  }, [round, minValue, maxValue]);
 
   // Hammer swing animation
   useEffect(() => {
