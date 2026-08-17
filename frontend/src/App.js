@@ -12,7 +12,7 @@ import LemonsResults from "./LemonsResults";
 import AuctionResults from "./AuctionResults";
 import Dashboard from "./Dashboard";
 
-const API = "http://127.0.0.1:8000";
+const API = "https://game-theory-platform-backend.onrender.com";
 
 function App() {
   const [page, setPage] = useState("landing");
